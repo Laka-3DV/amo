@@ -229,6 +229,20 @@ try {
   assert.doesNotMatch(
     presentCommandProblem({ code: "protocol", message: hiddenDiagnostic }),
     /crash|wrapper|private|protocol/i);
+  assert.equal(
+    presentCommandProblem({
+      code: "protocol",
+      message: "思考强度请求与当前会话引擎不匹配。",
+    }),
+    "当前会话已切换，请重新打开后再修改设置。",
+  );
+  assert.equal(
+    presentCommandProblem({
+      code: "protocol",
+      message: "protocol version mismatch: expected 39",
+    }),
+    "页面版本已更新，请刷新后重试。",
+  );
   assert.equal(presentHistoricalTurnProblem("error"), "该轮未正常结束");
   const unsupportedDshImage = "当前 DSH 模型不支持图片输入。";
   assert.equal(

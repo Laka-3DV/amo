@@ -227,7 +227,13 @@ class CodexBridge:
     async def failed_read(self, cmd, message):
         fields={"session_id":cmd.session_id,"sid":cmd.session_id,"events":[],
                 "authoritative":False,"error":message,"before":cmd.before,
-                "revision":self.machine._history_revision(cmd.session_id),
+                # Detail responses have no request id; the browser correlates
+                # them by revision. Echo the requested epoch even when a
+                # destructive mutation advanced the current history meanwhile,
+                # otherwise the successful failure response is discarded and
+                # its loading indicator never settles.
+                "revision":getattr(cmd,"revision",None)
+                or self.machine._history_revision(cmd.session_id),
                 "to":getattr(cmd,"client_id",None)}
         if cmd.type=="get_history":
             response=History(**fields)
@@ -707,6 +713,10 @@ class CodexBridge:
         return result
 
     async def detail(self, cmd):
+        current_revision=self.machine._history_revision(cmd.session_id)
+        if cmd.revision and cmd.revision != current_revision:
+            return await self.failed_read(
+                cmd, "会话历史已更新，请重新展开这轮过程")
         ctx=self.machine.sessions.get(cmd.session_id)
         native_turn=next((native for native,visible in ctx.sdk.turn_messages.items() if visible==cmd.turn_id),cmd.turn_id) if ctx else cmd.turn_id
         # Fetch just this turn's full items; the sidebar/history path uses the
@@ -722,7 +732,7 @@ class CodexBridge:
         if not items: raise ValueError("该轮过程不存在或已过期")
         from .machine import _turn_detail_page
         events,more,oldest,newer,cursor=_turn_detail_page(history_events(turn),before=cmd.before,limit=getattr(cmd,"limit",192),max_bytes=2*1024*1024)
-        result=TurnDetail(session_id=cmd.session_id,turn_id=cmd.turn_id,revision=self.machine._history_revision(cmd.session_id),
+        result=TurnDetail(session_id=cmd.session_id,turn_id=cmd.turn_id,revision=cmd.revision or current_revision,
             events=events,before=cmd.before,has_more=more,oldest_cursor=oldest,has_newer=newer,newer_cursor=cursor,to=getattr(cmd,"client_id",None))
         await self.machine.transport.send(result); return result
 

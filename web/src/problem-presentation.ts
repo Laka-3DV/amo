@@ -38,6 +38,24 @@ function ownershipMessage(message: string): string | null {
     .trim();
 }
 
+function protocolCommandMessage(message: string): string {
+  const trimmed = message.trim();
+  if (trimmed === "思考强度请求与当前会话引擎不匹配。"
+      || trimmed === "权限模式请求与当前会话引擎不匹配。") {
+    return "当前会话已切换，请重新打开后再修改设置。";
+  }
+  if (trimmed === "当前 DeepSeek Harness API 尚未提供取消归档。") {
+    return "DSH 当前暂不支持取消归档。";
+  }
+  if (trimmed === "当前远程后端不支持该操作，请更新页面后重试。") {
+    return "当前设备端暂不支持这项操作，请更新 Amo 后重试。";
+  }
+  if (/protocol (?:version )?(?:mismatch|upgrade required)/i.test(trimmed)) {
+    return "页面版本已更新，请刷新后重试。";
+  }
+  return "当前操作与会话状态不一致，请重试。";
+}
+
 export function presentTurnProblem(error: Pick<ErrorMsg, "code" | "message">): string {
   if (error.message.trim() === DSH_IMAGE_INPUT_UNSUPPORTED) {
     return DSH_IMAGE_INPUT_UNSUPPORTED;
@@ -86,7 +104,7 @@ export function presentCommandProblem(
     case "auth":
       return "当前操作不适用于这个会话。";
     case "protocol":
-      return "页面版本已更新，请刷新后重试。";
+      return protocolCommandMessage(error.message);
     case "fork_reconciling":
       return "正在确认派生结果，请稍候…";
     default:

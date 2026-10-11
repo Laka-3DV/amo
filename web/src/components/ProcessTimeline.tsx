@@ -643,6 +643,7 @@ export function ProcessTimeline({ blocks, done, active, durationMs, startTs, don
   const [localDetailError, setLocalDetailError] = useState<string | null>(null);
   const [now, setNow] = useState(Date.now());
   const manuallyToggled = useRef(false);
+  const detailRequestStarted = useRef(false);
   const tapGuard = useRef(new PointerTapGuard());
   const interactionTokens = useRef(new Map<number, number>());
   const pendingInteractionTokens = useRef(new Map<number, number>());
@@ -680,6 +681,26 @@ export function ProcessTimeline({ blocks, done, active, durationMs, startTs, don
   const waitingForContent = timelineItems.length === 0
     && processActive;
   const visibleDetailError = detailError ?? localDetailError;
+  useEffect(() => {
+    if (!open || !needsAuthoritativeDetail) {
+      detailRequestStarted.current = false;
+      return;
+    }
+    // A restored disclosure can already be open on the first render. In that
+    // case there is no click to trigger the deferred native history read, so
+    // request it here instead of leaving an empty "完整过程" shell forever.
+    if (detailLoading || visibleDetailError || detailRequestStarted.current) {
+      return;
+    }
+    detailRequestStarted.current = true;
+    setLocalDetailError(null);
+    if (onLoadDetail?.() === false) {
+      setLocalDetailError(DETAIL_REQUEST_ERROR);
+    }
+  }, [
+    detailLoading, needsAuthoritativeDetail, onLoadDetail, open,
+    visibleDetailError,
+  ]);
   const showOuterDisclosure = timelineItems.length > 0
     || hasDeferredOnly || waitingForContent || !!visibleDetailError
     || canLoadEarlier || canLoadNewer;
@@ -705,12 +726,14 @@ export function ProcessTimeline({ blocks, done, active, durationMs, startTs, don
       ? Math.max(0, now - (startTs ?? now))
       : durationMs != null && durationMs > 0 ? durationMs : null;
   const requestDetail = () => {
+    detailRequestStarted.current = true;
     setLocalDetailError(null);
     if (onLoadDetail?.() === false) {
       setLocalDetailError(DETAIL_REQUEST_ERROR);
     }
   };
   const retryDetail = () => {
+    detailRequestStarted.current = true;
     setLocalDetailError(null);
     if ((onRetryDetail ?? onLoadDetail)?.() === false) {
       setLocalDetailError(DETAIL_REQUEST_ERROR);
@@ -721,6 +744,7 @@ export function ProcessTimeline({ blocks, done, active, durationMs, startTs, don
     if (needsAuthoritativeDetail) {
       const next = !open;
       if (next && !detailLoading) requestDetail();
+      if (!next) detailRequestStarted.current = false;
       setUncontrolledOpen(next);
       onOpenChange?.(next);
       return;

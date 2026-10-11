@@ -427,6 +427,22 @@ def test_native_read_failures_return_correlated_history_and_detail_without_leavi
     asyncio.run(run())
 
 
+def test_native_detail_rejects_a_stale_revision_with_the_requested_correlation_key():
+    async def run():
+        m,tr,p=await setup()
+        stale=m._history_revision('codex@existing')
+        m._bump_history_revision('codex@existing')
+        detail=await m._handle(GetTurnDetail(
+            session_id='codex@existing',turn_id='old-turn',
+            revision=stale,client_id='phone'))
+        assert detail.type=='turn_detail' and detail.revision==stale
+        assert detail.authoritative is False and detail.error
+        assert not detail.events and detail.to=='phone'
+        assert not any(method=='thread/items/list' for method,_ in p.calls)
+        await cleanup(m)
+    asyncio.run(run())
+
+
 def test_native_reasoning_summaries_survive_a_fresh_history_read():
     async def run():
         m,tr,p=await setup()
