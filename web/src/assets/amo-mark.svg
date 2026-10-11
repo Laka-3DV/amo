@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 240" fill="none">
+  <defs>
+    <linearGradient id="ribbon" x1="38" y1="37" x2="193" y2="217" gradientUnits="userSpaceOnUse"><stop stop-color="#00D9ED"/><stop offset=".27" stop-color="#1765FF"/><stop offset=".51" stop-color="#7135FF"/><stop offset=".73" stop-color="#F514DA"/><stop offset="1" stop-color="#FFD466"/></linearGradient>
+    <linearGradient id="loop" x1="24" y1="108" x2="152" y2="206" gradientUnits="userSpaceOnUse"><stop stop-color="#00CEEF"/><stop offset=".4" stop-color="#1765FF"/><stop offset=".7" stop-color="#7533FF"/><stop offset="1" stop-color="#E819F3"/></linearGradient>
+    <linearGradient id="fold" x1="26" y1="93" x2="114" y2="113" gradientUnits="userSpaceOnUse"><stop stop-color="#164CE8"/><stop offset="1" stop-color="#22105D"/></linearGradient>
+    <linearGradient id="tab" x1="215" y1="134" x2="247" y2="162" gradientUnits="userSpaceOnUse"><stop stop-color="#9E24FA"/><stop offset="1" stop-color="#FF26C7"/></linearGradient>
+  </defs>
+  <rect x="202" y="132" width="44" height="47" rx="12" fill="url(#tab)"/>
+  <path d="M22 99C22 49 62 16 112 16H133C181 16 208 48 208 95V215C178 215 153 190 153 158V106C153 86 139 73 116 73H70C47 73 30 82 22 99Z" fill="url(#ribbon)"/>
+  <path d="M22 99C31 80 48 73 70 73H103C86 75 74 89 67 108L43 127C29 121 22 112 22 99Z" fill="url(#fold)"/>
+  <path fill-rule="evenodd" d="M102 91C119 91 132 102 140 121C122 118 107 126 91 139C73 153 63 159 63 173C63 185 73 193 89 193C111 193 130 174 153 152V173C131 208 114 224 82 224C42 224 15 197 15 161C15 123 50 91 82 91H102Z" fill="url(#loop)"/>
+</svg>

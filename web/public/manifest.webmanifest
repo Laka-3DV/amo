@@ -1,0 +1,30 @@
+{
+  "name": "Amo · 阿萌",
+  "short_name": "Amo",
+  "description": "Amo · Agent Remotify",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#F8FAFF",
+  "theme_color": "#F8FAFF",
+  "icons": [
+    {
+      "src": "/icon-192.png?v=amo-1",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.png?v=amo-1",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-maskable-512.png?v=amo-1",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

@@ -1,0 +1,248 @@
+"""Zero-token unit tests for the multi-session wrapper logic.
+
+No relay/wrapper/cc — these exercise the pure pieces directly:
+- protocol: SessionRekey round-trips and is a control frame (not seq'd).
+- ringbuffer: rebuild replay wraps the whole buffer in ReplayStart(rebuild=True).
+- machine._emit_locked: routes by ctx.key (real sid once known, else temp key)
+  so a pre-capture new session never leaks into the focused runtime.
+- machine._capture_session_id: re-keys the pool, follows focus ONLY when the
+  captured session was the focused one (the focus-steal fix), and emits
+  SessionRekey (NOT SessionFocus).
+
+Run: ./.venv/bin/python -m pytest tests/test_multisession.py -q
+"""
+from __future__ import annotations
+
+import asyncio
+import tempfile
+from pathlib import Path
+
+from cc_remote.config import WrapperConfig
+from cc_remote.protocol import (
+    serialize, deserialize, is_downstream,
+    Hello, SessionRekey, StateEvent, UserMsg, ReplayStart, ReplayEnd,
+    TurnEnd, TurnNotificationContext, TurnResult,
+)
+from cc_remote.wrapper.ringbuffer import RingBuffer
+from cc_remote.wrapper.session_ctx import SessionContext
+from cc_remote.wrapper.machine import WrapperMachine
+
+
+class _StubTransport:
+    """Captures everything the machine tries to send."""
+    def __init__(self):
+        self.sent: list = []
+        self.on_connected = None
+
+    async def send(self, msg):
+        self.sent.append(msg)
+
+
+def _mk_machine():
+    cfg = WrapperConfig()
+    state_tmp = tempfile.TemporaryDirectory(prefix="cc-remote-test-")
+    cfg.state_dir = Path(state_tmp.name)  # don't touch real state
+    cfg.claude_work_root = cfg.state_dir / "work" / "claude"
+    cfg.codex_work_root = cfg.state_dir / "work" / "codex"
+    tr = _StubTransport()
+    machine = WrapperMachine(cfg, tr)
+    # Keep the auto-cleanup owner alive exactly as long as the test machine.
+    # TemporaryDirectory's finalizer also runs at interpreter shutdown, so a
+    # full pytest pass cannot leave thousands of cc-remote-test-* directories.
+    machine._test_state_tmp = state_tmp
+    return machine, tr
+
+
+def _mk_ctx(key: str, session_id=None) -> SessionContext:
+    # Built inside the running loop so emit_lock binds to the right loop.
+    return SessionContext(
+        session_id=session_id,
+        sdk=object(),                       # unused in these tests
+        buffer=RingBuffer(1000, 10_000_000),
+        cwd="/tmp/cc-remote-test-cwd",
+        key=key,
+    )
+
+
+# ---- protocol ----
+
+def test_session_rekey_roundtrips_and_is_control_frame():
+    m = SessionRekey(old_key="tmp-abc", session_id="real-123", cwd="/tmp/x")
+    back = deserialize(serialize(m))
+    assert back.type == "session_rekey"
+    assert back.old_key == "tmp-abc"
+    assert back.session_id == "real-123"
+    assert back.cwd == "/tmp/x"
+    # control frame → never assigned a seq / buffered
+    assert is_downstream(m) is False
+
+
+def test_running_state_progress_roundtrips_without_becoming_an_error():
+    event = StateEvent(
+        state="running", phase="retrying", detail="HTTP 503，正在重试…",
+        msg_id="turn-1")
+    back = deserialize(serialize(event))
+    assert back.type == "state" and back.state == "running"
+    assert back.phase == "retrying" and "503" in back.detail
+    assert back.msg_id == "turn-1"
+    assert is_downstream(back) is True
+
+
+# ---- ringbuffer rebuild ----
+
+def test_ringbuffer_rebuild_wraps_full_buffer():
+    rb = RingBuffer(1000, 10_000_000)
+    for i in range(1, 4):
+        u = UserMsg(msg_id=f"m{i}", prompt="hi")
+        u.seq = i
+        rb.append(u)
+    frames = rb.replay_from(0, cc_session_id="s", state="idle", rebuild=True)
+    assert isinstance(frames[0], ReplayStart)
+    assert frames[0].rebuild is True and frames[0].truncated is False
+    assert isinstance(frames[-1], ReplayEnd)
+    body = [f for f in frames if getattr(f, "type", None) == "user_msg"]
+    assert [f.msg_id for f in body] == ["m1", "m2", "m3"]
+
+
+def test_ringbuffer_rebuild_on_empty_buffer_still_brackets():
+    rb = RingBuffer(1000, 10_000_000)
+    frames = rb.replay_from(0, cc_session_id="s", state="idle", rebuild=True)
+    assert isinstance(frames[0], ReplayStart) and frames[0].rebuild is True
+    assert isinstance(frames[-1], ReplayEnd)
+    assert len(frames) == 2
+
+
+def test_ringbuffer_marks_an_oversized_sequence_gap_and_advances_tail():
+    rb = RingBuffer(10, 1000)
+    first = UserMsg(msg_id="one", prompt="small")
+    first.seq = 1
+    dropped = UserMsg(msg_id="two", prompt="x" * 5000)
+    dropped.seq = 2
+    third = UserMsg(msg_id="three", prompt="small")
+    third.seq = 3
+    for event in (first, dropped, third):
+        rb.append(event)
+
+    frames = rb.replay_from(0, cc_session_id="s", state="running")
+    assert frames[0].truncated is True
+    assert frames[-1].to_seq == 3
+    assert [event.msg_id for event in frames if event.type == "user_msg"] == [
+        "one", "three"]
+
+
+def test_current_turn_replay_reports_evicted_user_message():
+    rb = RingBuffer(1, 10_000)
+    user = UserMsg(msg_id="turn", prompt="hello")
+    user.seq = 1
+    state = StateEvent(state="running")
+    state.seq = 2
+    rb.append(user)
+    rb.append(state)
+
+    frames = rb.current_turn_replay(generation="g")
+    assert len(frames) == 2
+    assert frames[0].truncated is True
+    assert frames[-1].to_seq == 2
+
+
+def test_current_turn_replay_never_reuses_previous_turn_during_preflight():
+    rb = RingBuffer(10, 10_000)
+    old = UserMsg(msg_id="old", prompt="previous")
+    old.seq = 1
+    running = StateEvent(state="running")
+    running.seq = 2
+    rb.append(old)
+    rb.append(running)
+
+    assert rb.current_turn_replay(
+        generation="g", message_id="new-not-emitted") == []
+
+
+# ---- emit routing (sid = the context's browser routing key) ----
+
+def test_live_turn_end_has_notification_context_but_ring_replay_does_not():
+    async def run():
+        machine, transport = _mk_machine()
+        ctx = _mk_ctx(key="session-notify", session_id="session-notify")
+        ctx.engine = "codex"
+        ctx.space = "work"
+        machine._remember_notification_title(
+            ctx.key, "  Fix\nnotifications\u0000 now  ")
+
+        await machine._emit_locked(ctx, TurnEnd(result=TurnResult(
+            subtype="success", duration_ms=12, is_error=False,
+        )))
+
+        live = transport.sent[-1]
+        assert live.notification_context == TurnNotificationContext(
+            engine="codex",
+            space="work",
+            display_name="Fix notifications now",
+        )
+        replay = next(
+            frame for frame in ctx.buffer.replay_from(
+                0,
+                cc_session_id=ctx.session_id,
+                state="idle",
+            )
+            if isinstance(frame, TurnEnd)
+        )
+        assert replay.notification_context is None
+
+    asyncio.run(run())
+
+
+def test_btw_turn_end_routes_owner_only_and_points_notification_to_parent():
+    async def run():
+        machine, transport = _mk_machine()
+        ctx = _mk_ctx(key="btw-private", session_id=None)
+        ctx.engine = "claude"
+        ctx.btw = True
+        ctx.parent_sid = "parent-session"
+        ctx.owner_client_id = "owner-client"
+        machine._remember_notification_title(
+            ctx.parent_sid, "Parent conversation")
+
+        await machine._emit_locked(ctx, TurnEnd(result=TurnResult(
+            subtype="error_during_execution",
+            duration_ms=4,
+            is_error=True,
+        )))
+
+        live = transport.sent[-1]
+        assert live.to == "owner-client"
+        assert live.sid == "btw-private"
+        assert live.notification_context == TurnNotificationContext(
+            engine="claude",
+            space="code",
+            display_name="Parent conversation",
+            parent_session_id="parent-session",
+        )
+        replay = next(
+            frame for frame in ctx.buffer.replay_from(
+                0,
+                cc_session_id=None,
+                state="idle",
+            )
+            if isinstance(frame, TurnEnd)
+        )
+        assert replay.notification_context is None
+
+    asyncio.run(run())
+
+
+def test_turn_notification_context_protocol_roundtrip():
+    message = TurnEnd(
+        result=TurnResult(subtype="success", duration_ms=1, is_error=False),
+        notification_context=TurnNotificationContext(
+            engine="claude",
+            space="code",
+            display_name="A named session",
+            parent_session_id="parent-1",
+        ),
+    )
+    restored = deserialize(serialize(message))
+    assert restored.notification_context == message.notification_context
+
+
+# ---- focus-steal fix ----

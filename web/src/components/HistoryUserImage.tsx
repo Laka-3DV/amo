@@ -1,0 +1,188 @@
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+
+import type { Turn } from "../domain/conversation";
+import {
+  historyImageDisplaySource,
+} from "../turn-image-previews";
+import type {
+  HistoryImageAsset,
+  HistoryImageVariant,
+} from "../history-image-assets";
+import {
+  historyImageAssetCacheSnapshot,
+  HISTORY_IMAGE_REQUEST_TIMEOUT_MS,
+  shouldAutoloadHistoryImage,
+  subscribeHistoryImageAssetCacheChanges,
+} from "../history-image-assets";
+
+export function HistoryUserImage({
+  turnId,
+  imageId,
+  width,
+  height,
+  asset,
+  fallback,
+  onLoad,
+  onPreview,
+}: {
+  turnId: string;
+  imageId: string;
+  width: number;
+  height: number;
+  asset?: HistoryImageAsset;
+  fallback?: NonNullable<Turn["images"]>[number];
+  onLoad?: (
+    turnId: string,
+    imageId: string,
+    variant: HistoryImageVariant,
+  ) => boolean;
+  onPreview: () => void;
+}) {
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const residencyKey = `${turnId}\u0000${imageId}`;
+  const residencyRef = useRef({
+    key: residencyKey,
+    observedAsset: false,
+  });
+  // This ref records render-visible residency, not merely a request attempt.
+  // Keep it across an LRU eviction so the image cannot auto-compete forever.
+  if (residencyRef.current.key !== residencyKey) {
+    residencyRef.current = { key: residencyKey, observedAsset: false };
+  }
+  if (asset) residencyRef.current.observedAsset = true;
+  const shouldAutoload = shouldAutoloadHistoryImage(
+    asset,
+    residencyRef.current.observedAsset,
+  );
+  const evicted = !asset && residencyRef.current.observedAsset;
+  const intersectingRef = useRef(false);
+  const waitingForCapacityRef = useRef(false);
+  const attemptedCacheSnapshotRef = useRef<number | null>(null);
+  const cacheSnapshot = useSyncExternalStore(
+    subscribeHistoryImageAssetCacheChanges,
+    historyImageAssetCacheSnapshot,
+    historyImageAssetCacheSnapshot,
+  );
+  const [stalled, setStalled] = useState(false);
+  useEffect(() => {
+    setStalled(false);
+    if (asset?.status !== "loading") return;
+    const elapsed = typeof asset.startedAt === "number"
+      ? Math.max(0, Date.now() - asset.startedAt)
+      : 0;
+    const remaining = Math.max(
+      0, HISTORY_IMAGE_REQUEST_TIMEOUT_MS - elapsed);
+    if (remaining === 0) {
+      setStalled(true);
+      return;
+    }
+    const timer = window.setTimeout(
+      () => setStalled(true),
+      remaining,
+    );
+    return () => window.clearTimeout(timer);
+  }, [
+    asset?.requestGeneration,
+    asset?.startedAt,
+    asset?.status,
+    imageId,
+    turnId,
+  ]);
+  useEffect(() => {
+    if (!shouldAutoload || !onLoad) {
+      intersectingRef.current = false;
+      waitingForCapacityRef.current = false;
+      return;
+    }
+    const node = triggerRef.current;
+    const requestThumbnail = (): boolean => {
+      const accepted = onLoad(turnId, imageId, "thumbnail");
+      // Consume every synchronous begin/cancel mutation caused by this attempt.
+      // A failed transport send must not wake the same component into a loop.
+      attemptedCacheSnapshotRef.current = historyImageAssetCacheSnapshot();
+      waitingForCapacityRef.current = !accepted;
+      return accepted;
+    };
+    if (!node || typeof IntersectionObserver === "undefined") {
+      intersectingRef.current = true;
+      requestThumbnail();
+      return () => {
+        intersectingRef.current = false;
+        waitingForCapacityRef.current = false;
+      };
+    }
+    const observer = new IntersectionObserver((entries) => {
+      intersectingRef.current = entries.some((entry) => entry.isIntersecting);
+      if (!intersectingRef.current) return;
+      if (requestThumbnail()) observer.disconnect();
+    }, { rootMargin: "500px 0px" });
+    observer.observe(node);
+    return () => {
+      intersectingRef.current = false;
+      waitingForCapacityRef.current = false;
+      observer.disconnect();
+    };
+  }, [asset, imageId, onLoad, shouldAutoload, turnId]);
+
+  // A full cache can reject an otherwise-visible image. Retry at most once for
+  // each cache admission wake; failed begin() calls do not publish, so this
+  // cannot turn into a render or network loop.
+  useEffect(() => {
+    if (!shouldAutoload || !onLoad || !intersectingRef.current
+        || !waitingForCapacityRef.current
+        || attemptedCacheSnapshotRef.current === cacheSnapshot) return;
+    const accepted = onLoad(turnId, imageId, "thumbnail");
+    attemptedCacheSnapshotRef.current = historyImageAssetCacheSnapshot();
+    waitingForCapacityRef.current = !accepted;
+  }, [
+    asset,
+    cacheSnapshot,
+    imageId,
+    onLoad,
+    shouldAutoload,
+    turnId,
+  ]);
+
+  const src = historyImageDisplaySource(asset, fallback);
+  const retryable = asset?.status === "error" || stalled || evicted;
+  const canRetry = retryable && !!onLoad;
+  const retryCanonical = () => {
+    const accepted = !!onLoad?.(turnId, imageId, "thumbnail");
+    attemptedCacheSnapshotRef.current = historyImageAssetCacheSnapshot();
+    waitingForCapacityRef.current = !accepted;
+    if (accepted) setStalled(false);
+  };
+  const imageButton = (
+    <button ref={triggerRef} type="button"
+      className="ubub-image-trigger history-image-trigger"
+      style={{ aspectRatio: `${width} / ${height}` }}
+      aria-label={src
+        ? "预览用户发送的图片"
+        : canRetry
+        ? "重试加载用户发送的图片"
+        : "预览用户发送的图片"}
+      disabled={!src && !canRetry}
+      onClick={() => {
+        if (src) onPreview();
+        else if (canRetry) retryCanonical();
+      }}>
+      {src
+        ? <img src={src} className="ubub-img" alt="用户发送的图片" />
+        : <span className={`history-image-placeholder${
+          canRetry ? " retryable" : ""
+        }`} aria-hidden="true">
+          {canRetry ? "点击重试" : ""}
+        </span>}
+    </button>
+  );
+  if (!src || !canRetry) return imageButton;
+  return (
+    <span className="history-image-control">
+      {imageButton}
+      <button type="button" className="history-image-retry"
+        onClick={retryCanonical}>
+        点击重试
+      </button>
+    </span>
+  );
+}

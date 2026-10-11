@@ -1,0 +1,319 @@
+/* Quiet motion: compositor-only movement, static shadows, no continuous loops. */
+:root{--motion-enter:280ms;--motion-exit:170ms;--motion-ease:cubic-bezier(.2,.78,.22,1)}
+.desktop-sidebar-trigger{flex:none}
+:root[data-touch-layout="true"] .desktop-sidebar-trigger{display:none}
+.queued-query-head-actions{display:flex;gap:4px;flex:none}
+.queued-query-copy-status{font-size:12px;color:var(--dim);margin-bottom:8px}
+.account-usage-sheet{max-width:520px}
+.account-usage-body{display:grid;gap:12px;overflow:auto;padding:0 20px 20px}
+.account-usage-card{border:1px solid var(--border);border-radius:16px;padding:18px;background:var(--surface)}
+.account-usage-card>header{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:16px}
+.account-plan{color:var(--dim);font-size:12px}
+.account-limit>div:first-child{display:flex;align-items:baseline;justify-content:space-between;gap:12px}
+.account-wallet strong{font-size:26px;font-weight:600;letter-spacing:-.5px;font-variant-numeric:tabular-nums}
+.account-usage-card small{display:block;color:var(--dim);font-size:12px;margin-top:7px;line-height:1.5}
+.account-usage-card p{font-size:13px;color:var(--dim);line-height:1.6;margin:8px 0}
+.account-usage-card .account-usage-note{font-size:12px;margin-top:14px}
+.account-limit{margin-top:12px;font-size:14px}
+.account-limit strong{font-weight:600;font-variant-numeric:tabular-nums}
+.account-limit-track{height:5px;border-radius:4px;background:var(--raised);overflow:hidden;margin:10px 0}
+.account-limit-track i{display:block;height:100%;background:var(--accent);border-radius:4px}
+/* Finger progress belongs to the panel/scrim, not their hundreds of children.
+   Registration prevents every frame invalidating all descendant styles. */
+@property --drawer-progress{syntax:"<number>";inherits:false;initial-value:0}
+:root[data-touch-layout="true"] .sessions{
+  --drawer-sign:1;visibility:hidden;pointer-events:none;
+  transition:transform 340ms var(--motion-ease),visibility 0s linear 340ms;
+  box-shadow:-16px 0 44px rgba(15,25,45,.13);
+}
+:root[data-touch-layout="true"] .sessions[data-side="left"]{
+  --drawer-sign:-1;box-shadow:16px 0 44px rgba(15,25,45,.13);
+}
+:root[data-device-layout="tablet"] .sessions{width:min(352px,92vw)}
+:root[data-touch-layout="true"] .sessions.show{
+  transform:none;visibility:visible;pointer-events:auto;
+  transition:transform 340ms var(--motion-ease),visibility 0s;
+}
+:root[data-touch-layout="true"] .sessions[data-side="left"] .s-head>.iconbtn svg{transform:none}
+:root[data-touch-layout="true"] .sessions[data-side="right"] .s-head>.iconbtn svg{transform:rotate(180deg)}
+:root[data-touch-layout="true"] .shell[data-drawer-dragging="true"] .sessions{
+  visibility:visible;transition:none;will-change:transform;
+  transform:translateX(calc(var(--drawer-sign) * (1 - var(--drawer-progress,0)) * 100%));
+}
+.scrim-side{background:rgba(14,24,42,.25);transition:opacity 280ms var(--motion-ease)}
+/* Native windowing skips offscreen painting while preserving exact layout.
+   Open menus opt out so they remain unclipped; touch targets never translate. */
+.sessions .s-scroll.activity-bottom>.sidebar-window{flex:none;margin-top:auto;width:100%;position:relative}
+.sidebar-window-row{width:100%;contain:layout style;content-visibility:auto}
+.sidebar-window[data-measuring="true"]>.sidebar-window-row,
+.sidebar-window-row:has(.menu-open,.scard-rename,.sgroup-head:hover,.sgroup-head:focus-within){content-visibility:visible}
+.sidebar-window-row:has(.menu-open,.sgroup-head:hover,.sgroup-head:focus-within){position:relative;z-index:6}
+.sidebar-window-row.card{padding-bottom:5px}
+.sidebar-window-row.indented{width:calc(100% - 24px);margin-left:24px}
+:root[data-touch-layout="true"] .shell[data-drawer-dragging="true"] .scrim-side{
+  opacity:var(--drawer-progress,0);transition:none;
+}
+/* Open dialogs grow from their anchor without putting actions below the keyboard.
+   No fill-mode keeps transform:none once touch dialogs settle. */
+.sheet.show{animation:panel-enter var(--motion-enter) var(--motion-ease);transform-origin:center bottom}
+:root[data-touch-layout="true"] .picker-sheet.show{animation:panel-enter var(--motion-enter) var(--motion-ease)}
+.scrim.show,.header-menu-scrim{animation:veil-enter 180ms ease-out}
+.header-menu-card,.device-sheet{animation:menu-enter 190ms var(--motion-ease);transform-origin:top right}
+/* Scroll-contained menus keep fixed hit targets during appearance. */
+.card-menu{animation:veil-enter 160ms ease-out}
+@keyframes panel-enter{from{opacity:0;transform:scale(.985)}to{opacity:1;transform:none}}
+@keyframes veil-enter{from{opacity:0}to{opacity:1}}
+@keyframes menu-enter{from{opacity:0;transform:translateY(-4px) scale(.975)}to{opacity:1;transform:none}}
+@media(min-width:980px){
+  :root[data-device-layout="desktop"] .sheet.show{animation:desktop-panel-enter var(--motion-enter) var(--motion-ease);transform-origin:center}
+}
+@keyframes desktop-panel-enter{from{opacity:0;transform:translate(-50%,-48%) scale(.98)}to{opacity:1;transform:translate(-50%,-50%) scale(1)}}
+/* Tablet headers have room for a readable device name. Phones keep the icon. */
+:root[data-device-layout="tablet"] .c-head .device-trigger{
+  width:auto;min-width:44px;max-width:clamp(140px,24vw,240px);padding:0 11px;gap:8px;
+  border:1px solid var(--border);background:var(--surface);border-radius:var(--r-btn);justify-content:center;
+}
+:root[data-device-layout="tablet"] .device-trigger>svg{flex:none}
+:root[data-device-layout="tablet"] .device-trigger>span{display:block;min-width:0;font-size:12px}
+:root[data-device-layout="tablet"] .device-trigger>i{right:6px;bottom:5px}
+/* Official static provider marks; execution keeps its separate solid dot. */
+.agent-badge{--agent-color:#4D6BFE;--agent-alt:#4D6BFE;display:inline-flex;align-items:center;gap:5px;flex:none;color:var(--agent-color);font:500 11px/16px var(--sans);white-space:nowrap}
+.agent-codex{--agent-color:var(--text);--agent-alt:var(--text)}
+.agent-claude{--agent-color:#B96F4D;--agent-alt:#E3AC77}
+.agent-logo{display:block;width:16px;height:16px;object-fit:contain;flex:none}
+:root[data-theme="dark"] .agent-dsh{--agent-color:#8BA5FF;--agent-alt:#4D6BFE}
+.agent-logo-mask{background:currentColor;mask-size:contain;mask-position:center;mask-repeat:no-repeat;-webkit-mask-size:contain;-webkit-mask-position:center;-webkit-mask-repeat:no-repeat}
+:root[data-theme="dark"] .agent-claude{--agent-color:#E5AE91;--agent-alt:#F0CE9E}
+.c-head .session-context{display:flex!important;align-items:center;gap:7px;min-height:16px;min-width:0}
+.session-context>.mobile-session-heading,.session-context>.desktop-session-heading{min-width:0;overflow:hidden;text-overflow:ellipsis}
+.session-context .session-agent-badge{font-size:10px;line-height:14px}
+.session-context .agent-logo{width:14px;height:14px}
+.sessions .search>input{min-width:0;flex:1}
+.agent-filters{display:flex;gap:8px;padding:0 16px 10px;flex:none}
+.agent-filter-chip{--agent-color:#4D6BFE;--agent-alt:#4D6BFE;position:relative;display:inline-flex;align-items:center;gap:10px;min-height:36px;padding:0 11px;border:1px solid var(--border);border-radius:var(--r-btn);background:var(--surface);cursor:pointer;transition:background 140ms ease,border-color 140ms ease}
+.agent-filter-chip.agent-codex{--agent-color:var(--text);--agent-alt:var(--text)}
+.agent-filter-chip input{position:absolute;inset:0;width:100%;height:100%;margin:0;opacity:0;cursor:pointer}
+.agent-filter-chip .agent-badge{font-size:12px;pointer-events:none}
+.agent-filter-check{display:flex;color:var(--agent-color);opacity:0;pointer-events:none}
+.agent-filter-chip:has(input:checked){border-color:color-mix(in srgb,var(--agent-color) 35%,var(--border));background:color-mix(in srgb,var(--agent-color) 7%,var(--surface))}
+.agent-filter-chip:has(input:checked) .agent-filter-check{opacity:1}
+.agent-filter-chip:has(input:focus-visible){outline:2px solid var(--agent-color);outline-offset:2px}
+.agent-filter-chip:has(input:not(:checked)) .agent-badge{opacity:.55}
+.composer-control-note{display:flex;align-items:flex-start;gap:7px;color:var(--dim);font-size:12px;line-height:1.5;padding:4px 8px 7px}
+.composer-control-note>svg{flex:none;margin-top:2px}
+@media(prefers-reduced-motion:reduce){
+  .sessions,.scrim-side,.sheet,.scrim,.header-menu-card,.header-menu-scrim,.card-menu,.device-sheet{animation:none!important;transition:none!important}
+}
+
+:root[data-touch-layout="true"] .sheet.show.motion-exit,.sheet.show.motion-exit{animation:panel-exit 160ms ease-in;pointer-events:none}
+.scrim.show.motion-exit{animation:veil-exit 160ms ease-in;pointer-events:none}
+@keyframes panel-exit{from{opacity:1;transform:none}to{opacity:0;transform:scale(.99)}}
+@keyframes veil-exit{from{opacity:1}to{opacity:0}}
+@media(min-width:980px){
+  :root[data-device-layout="desktop"] .sheet.show.motion-exit{animation:desktop-panel-exit 160ms ease-in}
+}
+@keyframes desktop-panel-exit{from{opacity:1;transform:translate(-50%,-50%) scale(1)}to{opacity:0;transform:translate(-50%,-49%) scale(.99)}}
+@media(prefers-reduced-motion:reduce){.sheet.show.motion-exit,.scrim.show.motion-exit{animation:none!important;opacity:0}}
+
+/* Reading density is independent of the chosen visual theme. */
+:root{--chat-leading:1.45;--chat-paragraph-gap:7px;--chat-section-gap:13px}
+:root[data-chat-spacing="standard"]{--chat-leading:1.62;--chat-paragraph-gap:10px;--chat-section-gap:18px}
+:root[data-chat-spacing="relaxed"]{--chat-leading:1.8;--chat-paragraph-gap:14px;--chat-section-gap:22px}
+:root[data-layout] .thread :is(.prose,.ubub,.process-copy,.process-progress){line-height:var(--chat-leading)}
+:root[data-layout] .thread .prose p{margin-bottom:var(--chat-paragraph-gap)}
+:root[data-layout] .thread .prose p:last-child{margin-bottom:0}
+:root[data-layout] .thread .prose :is(h1,h2,h3){margin-top:var(--chat-section-gap)}
+:root[data-layout] .thread .prose :is(ul,ol){margin-block:var(--chat-paragraph-gap)}
+.chat-spacing-setting{padding:4px 14px 14px;display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:12px;color:var(--dim)}
+.chat-spacing-setting [role="group"]{display:flex;gap:3px;padding:3px;background:var(--raised);border:1px solid var(--border);border-radius:10px}
+.chat-spacing-setting button{min-height:34px;padding:5px 10px;border-radius:7px;color:var(--dim)}
+.chat-spacing-setting button[aria-pressed="true"]{background:var(--surface);color:var(--text);box-shadow:var(--shadow-sm)}
+/* The title itself is navigation; no extra sidebar glyph or fixed Code label. */
+:root[data-layout] .c-head .session-heading-trigger{display:flex;flex-direction:column;align-items:flex-start;flex:1;min-width:0;padding:4px 0;border:0;border-radius:6px;background:transparent;text-align:left;color:var(--text);cursor:pointer}
+:root[data-layout] .session-heading-trigger .ttl{width:100%;min-width:0;display:flex;align-items:center;gap:5px}
+:root[data-layout] .session-heading-trigger .surface-head-title{flex:1;min-width:0;font:600 16px/1.3 var(--sans);letter-spacing:-.02em}
+:root[data-layout] .session-heading-trigger .surface-head-title>span{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+:root[data-layout] .session-heading-trigger .session-context{width:100%;margin-top:3px;display:flex!important;align-items:center;gap:7px;font-size:11px;color:var(--dim)}
+.session-heading-directory{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.session-heading-branch{display:inline-flex;align-items:center;gap:4px;max-width:36%;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--dim);font-size:11px;opacity:.92}
+.session-heading-branch svg{flex:none}
+.session-heading-trigger:hover .surface-head-title{color:var(--accent-ink)}
+.session-heading-trigger:focus-visible{outline:2px solid var(--accent-line);outline-offset:3px}
+/* Fixed content and flex basis keep device navigation legible in every theme. */
+:root[data-layout] .c-head .device-trigger{display:flex;align-items:center;justify-content:center;flex:0 0 auto;width:auto!important;min-width:68px;max-width:none;height:36px;padding:0 9px;gap:5px;border:1px solid var(--border);border-radius:var(--r-btn,10px);background:var(--surface);color:var(--dim);box-shadow:none}
+:root[data-layout] .c-head .device-trigger>svg{flex:none;width:17px;height:17px}
+:root[data-layout] .c-head .device-trigger>span{display:block!important;flex:none;width:auto;max-width:none;font:500 11px/1 var(--sans);overflow:visible;white-space:nowrap}
+:root[data-layout] .c-head .device-trigger>i{right:5px;bottom:4px}
+:root[data-layout] .c-head{gap:8px}
+:root[data-device-layout="phone"] .c-head .hstat{padding:4px 6px;font-size:10px;gap:4px;flex:none}
+/* Three stable information rows, quiet dividers rather than stacked cards. */
+:root[data-layout] .sessions .scard{border:0;border-bottom:1px solid var(--border);border-radius:0;background:transparent;box-shadow:none;padding:12px 12px 10px;margin:0}
+:root[data-layout] .sessions .scard.active{background:var(--accent-weak);border-bottom-color:var(--accent-line);box-shadow:none;border-radius:10px}
+:root[data-layout] .sessions .scard .scard-title{display:block;font:550 14px/1.4 var(--sans);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;-webkit-line-clamp:unset}
+:root[data-layout] .sessions .scard .scard-title.full-title{white-space:normal;overflow-wrap:anywhere}
+:root[data-layout] .sessions .scard-meta{display:flex;align-items:center;gap:8px;margin-top:5px;min-height:17px;flex-wrap:nowrap}
+:root[data-layout] .sessions .scard-location{min-width:0;flex:1;display:flex;align-items:center;gap:5px;color:var(--dim);font-size:11px}
+:root[data-layout] .sessions .scard-location>span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+:root[data-layout] .sessions .scard-engine{font-size:10px;color:var(--agent-color)}
+.scard-status{display:flex;align-items:center;gap:7px;margin-top:5px;min-height:18px;color:var(--dim);font-size:10px}
+.scard-status .scard-activity{margin-left:auto}
+.scard-status .pill{padding:2px 5px;font-size:10px;border:0;background:transparent}
+.session-idle-label{font-size:10px;color:var(--dim)}
+/* File mutations occupy one row until explicitly opened. */
+:root[data-layout] .turn-files{display:block;margin-top:10px;min-height:32px}
+:root[data-layout] .turn-files-summary{display:inline-flex;align-items:center;gap:7px;min-height:32px;padding:5px 9px;border:1px solid var(--border);background:var(--raised);color:var(--dim);border-radius:9px;font-size:11px}
+.turn-files-sheet-list{overflow-y:auto;min-height:0;padding:0 14px 12px;overscroll-behavior:contain}
+.turn-files-sheet-list>button{display:flex;align-items:center;gap:10px;width:100%;padding:11px 4px;border-bottom:1px solid var(--border);color:var(--dim);text-align:left}
+.turn-files-sheet-list>button>span{flex:1;min-width:0}
+.turn-files-sheet-list b{display:block;color:var(--text);font-size:13px;font-weight:550;overflow-wrap:anywhere}
+.turn-files-sheet-list small{display:block;font-size:10px;color:var(--dim);margin-top:3px;overflow-wrap:anywhere}
+.turn-files-view-diff{display:flex;align-items:center;justify-content:center;gap:6px;min-height:44px;flex:none;border-top:1px solid var(--border);color:var(--accent-ink);font-size:12px}
+.turn-tail-controls{display:flex;justify-content:flex-end;margin-top:7px}
+.turn-collapse-process{display:inline-flex;align-items:center;gap:5px;min-height:32px;padding:4px 7px;color:var(--dim);font-size:11px;border-radius:7px}
+.turn-collapse-process svg{transform:rotate(180deg)}
+.turn-collapse-process:hover{background:var(--raised);color:var(--text)}
+.queued-attachment-editor{margin-top:10px}
+.queued-add-attachment{display:inline-flex;align-items:center;gap:5px;min-height:36px;padding:5px 9px;border:1px solid var(--border);border-radius:9px;color:var(--dim);font-size:12px}
+.queued-new-attachments{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.queued-new-attachments button{display:flex;align-items:center;gap:5px;max-width:100%;min-height:32px;padding:4px 7px;border:1px solid var(--border);border-radius:8px;font-size:11px;color:var(--dim)}
+.queued-new-attachments button>span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.queued-new-attachments img{width:40px;height:40px;object-fit:cover;border-radius:5px}
+.queued-attachment-editor p{font-size:12px;color:var(--danger);margin:5px 0}
+:root[data-layout] .sessions .scard-top{display:flex;align-items:center;gap:5px}
+:root[data-layout] .sessions .scard-title{flex:1;min-width:0}
+:root[data-layout] .sessions .scard-title-toggle{display:flex;align-items:center;justify-content:center;flex:none;width:24px;height:24px;margin:0;padding:3px;color:var(--dim)}
+.scard-title-toggle[aria-expanded="true"] svg{transform:rotate(180deg)}
+@media(max-width:980px){.artifact-panel{top:calc(var(--app-offset-top,0px) + 72px);height:calc(var(--app-height,100dvh) - 82px)}}
+:root[data-layout] .sessions .scard-title-toggle{min-height:24px}
+:root[data-layout] .sessions .scard .scard-meta{padding-right:0!important}
+
+/* Short account disclosures and a focused rename sheet share the panel rhythm. */
+.account-wallet summary{display:flex;align-items:center;gap:10px;min-height:42px;cursor:pointer;list-style:none}
+.account-wallet summary::-webkit-details-marker{display:none}
+.account-wallet summary strong{margin-left:auto}
+.account-wallet summary>svg{color:var(--faint);transition:transform 160ms ease}
+.account-wallet[open] summary>svg{transform:rotate(180deg)}
+.account-wallet-details{border-top:1px solid var(--border);padding:10px 0 4px}
+.account-wallet-details>div{display:flex;justify-content:space-between;gap:12px;padding:4px 0;font-size:12px;color:var(--dim)}
+.account-wallet-details b{font-weight:500;font-variant-numeric:tabular-nums;color:var(--text)}
+.account-wallet-details p{font-size:11px;line-height:1.45;color:var(--faint)}
+.account-wallet-details a{display:inline-flex;align-items:center;gap:4px;font-size:12px;color:var(--accent);text-decoration:none;padding:4px 0}
+.account-limit .account-reset-countdown{display:block;color:var(--dim);font-variant-numeric:tabular-nums;margin-top:6px}
+.rename-session-scrim{z-index:80}
+.rename-session-sheet{z-index:81}
+.rename-session-body{padding:10px 20px 8px}
+.rename-session-body input{width:100%;box-sizing:border-box;padding:12px 14px;font:400 16px/1.4 var(--sans);color:var(--text);background:var(--bg);border:1px solid var(--border);border-radius:12px;outline:none}
+.rename-session-body input:focus{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-weak)}
+/* Tablet dialogs float in the visible viewport, including above its keyboard. */
+:root[data-device-layout="tablet"] :is(.account-usage-sheet,.rename-session-sheet){position:fixed;left:50%;right:auto;top:calc(var(--app-offset-top,0px) + var(--app-height,100dvh)/2);bottom:auto;width:min(520px,calc(100vw - 40px));max-height:calc(var(--app-height,100dvh) - 32px);border:1px solid var(--border);border-radius:var(--r-panel)}
+:root[data-device-layout="tablet"] :is(.account-usage-sheet,.rename-session-sheet).show{transform:translate(-50%,-50%);animation:desktop-panel-enter var(--motion-enter) var(--motion-ease);transform-origin:center}
+
+/* Amo identity: a transparent ribbon on quiet surfaces, no raster backdrop. */
+.amo-mark{display:inline-grid;place-items:center;flex:none;position:relative;vertical-align:middle}
+.amo-mark img{display:block;width:100%;height:100%;object-fit:contain}
+:root:is([data-layout="terminal"],[data-layout="engineering"]) .amo-mark{background:currentColor;mask:url('/amo-mark.svg?v=amo-1') center/contain no-repeat;-webkit-mask:url('/amo-mark.svg?v=amo-1') center/contain no-repeat}
+:root:is([data-layout="terminal"],[data-layout="engineering"]) .amo-mark img{visibility:hidden}
+:root[data-layout][data-appearance] .sessions .brand{gap:10px;min-width:0}
+:root[data-layout][data-appearance] .sessions .brand .name{display:flex;flex-direction:column;gap:3px;font-family:var(--sans);line-height:1.1}
+:root[data-layout][data-appearance] .sessions .brand .name b{font-size:22px;font-weight:650;letter-spacing:-.045em;color:var(--text)}
+:root[data-layout][data-appearance] .sessions .brand .name span{font-size:10px;font-weight:400;letter-spacing:.025em;color:var(--dim)}
+:root[data-layout][data-appearance] .sessions .s-head{padding:18px 20px 14px;gap:10px}
+:root[data-layout][data-appearance] .sessions .s-view-switch{margin:0 18px 10px;padding:3px;border-radius:12px;min-height:40px}
+:root[data-layout][data-appearance] .sessions .s-view-switch button{min-height:34px;padding:6px 8px;font-size:12px}
+:root[data-layout][data-appearance] .sessions .search{margin:0 18px 10px;height:42px;min-height:42px;border-radius:12px}
+:root[data-layout][data-appearance] .sessions .agent-filters{margin:0 18px 12px;padding:0;gap:8px}
+:root[data-layout][data-appearance] .sessions .agent-filter-chip{min-height:32px;padding:5px 9px;border-radius:9px}
+:root[data-layout][data-appearance] .sessions .s-scroll{padding:0 10px 10px}
+:root[data-layout][data-appearance] .sessions .scard{padding:12px 10px;margin:0;border-bottom:1px solid color-mix(in srgb,var(--border) 75%,transparent);border-radius:0;background:transparent;box-shadow:none}
+:root[data-layout][data-appearance] .sessions .scard.active{border-radius:10px;background:var(--accent-weak);border-bottom-color:transparent;box-shadow:none}
+:root[data-layout][data-appearance] .sessions .scard-top{min-height:22px;margin:0;padding-right:40px;gap:4px}
+:root[data-layout][data-appearance] .sessions .scard .scard-title{font:550 14px/1.5 var(--sans);letter-spacing:-.012em}
+:root[data-layout][data-appearance] .sessions .scard-meta{margin-top:5px;min-height:18px;gap:7px}
+:root[data-layout][data-appearance] .sessions .scard-location{flex:0 1 auto;max-width:65%;font-size:11px;gap:5px}
+:root[data-layout][data-appearance] .sessions .scard-engine{flex:none;font-size:10px;gap:4px}
+:root[data-layout][data-appearance] .sessions .scard-engine:before{content:"";height:10px;width:1px;background:var(--border-strong);margin-right:3px}
+:root[data-layout][data-appearance] .sessions .scard-status{margin-top:4px;min-height:18px;padding:0;font-size:10px;gap:7px}
+:root[data-layout][data-appearance] .sessions .scard-status .pill{padding:0;background:transparent;font-weight:500}
+:root[data-layout][data-appearance] .sessions .scard-actions{top:7px;right:5px}
+:root[data-layout][data-appearance] .sessions .s-foot{padding:10px 18px calc(10px + max(0px,calc(env(safe-area-inset-bottom) - var(--keyboard-inset,0px))))}
+:root[data-layout][data-appearance] .sessions .newbtn{border-radius:12px;min-height:44px;box-shadow:none;font-size:13px;font-weight:550}
+.session-copy-error{max-width:210px;padding:7px 12px;color:var(--danger);font-size:11px;line-height:1.5}
+/* Authentication uses the same type scale and controls as the app. Scroll
+ * instead of clipping on a short visual viewport when the keyboard opens. */
+.login{overflow-y:auto;align-items:safe center;padding:64px 24px 24px}
+.login .tt{top:calc(var(--app-offset-top,0px) + max(14px,env(safe-area-inset-top)));right:max(16px,env(safe-area-inset-right))}
+.login-card{max-width:350px;padding:12px 0;flex:none;text-align:left}
+.login-brand{display:flex;align-items:center;gap:15px;margin:0 0 18px}
+.login-brand .brand-mark{color:var(--text)}
+.login-brand .name{display:flex;flex-direction:column;gap:5px;font-family:var(--sans);line-height:1}
+.login-brand .name b{font-size:46px;font-weight:650;letter-spacing:-.06em}
+.login-brand .name span{font-size:13px;letter-spacing:.18em;color:var(--dim)}
+.login-tag{font:400 19px/1.5 var(--sans);letter-spacing:-.015em;color:var(--text);margin:0 0 12px}
+.login-agents{display:flex;align-items:center;gap:12px;color:var(--faint);margin-bottom:32px}
+.login-agents .agent-badge{font-size:12px;gap:6px}
+.login-form-label{font-size:11px;letter-spacing:.02em;color:var(--dim);margin:0 0 10px}
+.login-field{height:52px;border:1px solid var(--border-strong);border-radius:14px;margin-bottom:10px;box-shadow:0 1px 2px #00000003}
+.login-field:focus-within{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-weak)}
+.login-btn{height:48px;color:var(--on-accent,#fff);font-size:14px;font-weight:550;margin-top:4px;box-shadow:none}
+.login-btn:disabled{opacity:.55}
+.login-note{display:flex;align-items:center;justify-content:center;gap:5px;font-size:11px;color:var(--dim);margin:16px 0 0}
+.login-err{text-align:left;line-height:1.5;margin:2px 0 10px}
+:root[data-layout="pixel"] .login :is(.login-field,.login-btn){border-radius:4px}
+@media(max-height:480px){.login{padding-top:54px}.login-brand{margin-bottom:10px}.login-brand .brand-mark .amo-mark{width:40px!important;height:40px!important}.login-brand .name b{font-size:32px}.login-agents{margin-bottom:16px}.login-tag{font-size:16px}}
+
+:root[data-layout][data-appearance] .sessions .scard-act{width:44px;height:44px;min-height:44px;background:transparent;border:0}
+:root[data-layout="terminal"] .sessions .scard .scard-title{font-family:var(--mono);font-size:13px}
+:root[data-layout][data-appearance] .sessions .agent-filter-chip:has(input:checked){background:var(--surface)}
+
+.sessions .card-menu{overflow-y:auto;overscroll-behavior:contain}
+.sessions .card-menu.above{top:auto;bottom:calc(100% - 28px)}
+
+/* Progressive rows use real layout without measuring the complete catalog. */
+.sidebar-window-row{content-visibility:visible}
+.sidebar-load-older{display:block;width:100%;border:0;background:transparent;color:var(--muted);font:inherit;font-size:12px;padding:12px;cursor:pointer}
+.turn-reply-summary{display:flex;align-items:center;gap:8px;width:100%;padding:12px 14px;margin:10px 0;border:1px solid var(--border);border-radius:12px;background:var(--surface);color:var(--muted);font:inherit;font-size:13px;text-align:left;cursor:pointer}
+.turn-reply-expand{margin-left:auto;color:var(--accent)}
+.turn-reply-summary:hover{color:var(--text)}
+
+/* A docked sidebar shares one edge with chat; drawer shadows are touch-only. */
+@media(min-width:980px){
+  :root[data-device-layout="desktop"][data-layout][data-appearance] .shell .sessions{
+    border-left:0;border-right:0;border-radius:0;box-shadow:none;
+  }
+  :root[data-device-layout="desktop"] .shell.sidebar-open .pane{border-left:0}
+}
+
+/* One quiet utility cluster, with identical hit targets across themes. */
+.header-utilities{display:flex;align-items:center;gap:2px;flex:none}
+:root[data-layout][data-appearance] .c-head .header-utilities .device-trigger,
+:root[data-layout][data-appearance] .c-head .header-utilities .header-menu-trigger{width:40px!important;min-width:40px;max-width:40px;height:44px;padding:0;display:flex;justify-content:center;align-items:center;border:0;border-radius:12px;background:transparent;color:var(--dim);box-shadow:none}
+:root[data-layout][data-appearance] .header-utilities :is(.device-trigger,.header-menu-trigger):hover{background:var(--accent-weak);color:var(--text)}
+:root[data-layout][data-appearance] .header-utilities .device-trigger>i{right:7px;bottom:9px;border-color:var(--bg)}
+:root[data-layout][data-appearance] .header-utilities .hstat{background:transparent;padding:0 6px;min-height:44px;font-size:10px}
+:root[data-layout][data-appearance] .sessions .s-foot{display:flex;align-items:center;gap:10px;justify-content:space-between;border-top:1px solid var(--border);padding-top:8px}
+:root[data-layout][data-appearance] .sessions .s-foot .agent-filters{display:flex;align-items:center;flex:1;gap:4px;margin:0;padding:0;min-width:0}
+:root[data-layout][data-appearance] .sessions .s-foot .agent-filter-chip{padding:5px 7px;min-height:44px;gap:5px;background:transparent;border:0;white-space:nowrap;font-size:11px}
+:root[data-layout][data-appearance] .sessions .s-foot .agent-filter-chip .agent-badge{font-size:11px;gap:4px}
+:root[data-layout][data-appearance] .sessions .s-foot .newbtn{flex:none;width:auto;min-height:40px;padding:0 11px;gap:4px;font-size:12px;border-radius:11px}
+.turn-tail-controls{align-items:center;justify-content:space-between;gap:10px;min-height:30px;margin-top:8px}
+.turn-tail-controls .turn-working{margin:0;min-width:0}
+.turn-tail-controls .turn-working-tx{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.turn-tail-controls .turn-collapse-process{flex:none;margin-left:auto}
+.amo-mark-vector,.amo-mark-vector>svg{display:block;width:100%;height:100%}
+:root:is([data-layout="terminal"],[data-layout="engineering"]) .amo-mark .amo-mark-vector{visibility:hidden}
+.login-eyebrow{font:500 10px/1.5 var(--sans);letter-spacing:.2em;color:var(--dim);margin-bottom:24px}
+.login-card{max-width:360px}
+.login-brand{margin-bottom:24px}
+.login-agents{margin-bottom:36px}
+.login-field{border-radius:12px;box-shadow:none}
+.login-btn{border-radius:12px}
+@media(min-width:980px){
+  /* Sidebar and pane share one exact moving boundary. No independent
+     transform interpolation can reveal the shell between them. */
+  :root[data-device-layout="desktop"] .shell{--desktop-drawer-width:352px;--desktop-drawer-offset:0px;transition:--desktop-drawer-offset .3s var(--ease);background:var(--bg)}
+  :root[data-device-layout="desktop"] .shell.sidebar-open{--desktop-drawer-offset:352px}
+  :root[data-device-layout="desktop"] .shell .sessions{left:calc(var(--desktop-drawer-offset) - var(--desktop-drawer-width));transform:none!important;transition:none;background:var(--bg)}
+  :root[data-device-layout="desktop"] .shell .pane{margin-left:var(--desktop-drawer-offset);width:calc(100% - var(--desktop-drawer-offset));transition:padding-right .26s var(--ease)}
+}
+@property --desktop-drawer-offset{syntax:'<length>';inherits:true;initial-value:0px}
+@media(prefers-reduced-motion:reduce){:root[data-device-layout="desktop"] .shell{transition:none!important}}

@@ -1,0 +1,31 @@
+[Unit]
+Description=Amo relay
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=amo
+Group=amo
+WorkingDirectory=/opt/amo
+EnvironmentFile=/etc/amo/relay.env
+Environment=AMO_HOME=/var/lib/amo
+Environment=PYTHON_DOTENV_DISABLED=1
+ExecStart=/opt/amo/.venv/bin/python -m amo relay
+Restart=on-failure
+RestartSec=3
+UMask=0077
+LimitCORE=0
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/amo
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+
+[Install]
+WantedBy=multi-user.target

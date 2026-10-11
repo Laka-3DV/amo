@@ -1,0 +1,31 @@
+# Local credentials and runtime data
+.env
+.env.*
+!.env.example
+*.env
+!*.env.example
+**/device.json
+**/auth.json
+**/secrets/
+*.pem
+*.key
+*.p12
+*.sqlite*
+*.db
+*.log
+*.har
+work/
+.state/
+
+# Development and build outputs
+.venv/
+venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+.DS_Store
+web/node_modules/
+web/dist/
+web/test-results/
+web/playwright-report/
